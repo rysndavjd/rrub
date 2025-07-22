@@ -1,14 +1,13 @@
-use alloc::string::String;
 use alloc::vec::Vec;
 use uefi::fs::Path;
 use uefi::proto::console::text::{Input, Key, ScanCode};
-use uefi::{boot, println, Char16, Result as UefiResult, ResultExt};
+use uefi::{boot, println, ResultExt};
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder},
     prelude::*,
     text::Text,
 };
-use crate::display::UefiDisplay;
+use crate::display::Display;
 use crate::error::RrubError;
 use embedded_graphics::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;
@@ -19,9 +18,10 @@ use embedded_graphics::Drawable;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::primitives::PrimitiveStyle;
 use crate::alloc::string::ToString;
+use crate::usb::Usb2HostController;
 
-pub struct Terminal<'a> /*<'a, DT: DrawTarget<Color = Rgb888>>*/ {
-    //pub draw_target: &'a mut DT,
+pub struct Terminal<'a, DT: DrawTarget<Color = Rgb888>> {
+    pub draw_target: &'a mut DT,
     pub line_buffer: Vec<char>,
     pub style: MonoTextStyle<'static, Rgb888>,
     pub cursor: Point,
@@ -31,8 +31,8 @@ pub struct Terminal<'a> /*<'a, DT: DrawTarget<Color = Rgb888>>*/ {
     pub root: Option<&'a Path>
 }
 
-// Implement debug formatter manually to omit buffer field
-impl core::fmt::Debug for Terminal<'_> {
+#[cfg(feature = "uefi")]
+impl core::fmt::Debug for Terminal<'_, Display> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Terminal")
             .field("line_buffer", &self.line_buffer)
@@ -45,11 +45,9 @@ impl core::fmt::Debug for Terminal<'_> {
     }
 }
 
-impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ { 
-    
+impl<'a, DT: DrawTarget<Color = Rgb888>> Terminal<'a, DT> { 
     pub fn clear_screen<D: DrawTarget<Color = Rgb888>>(
             &mut self, 
-            draw_target: &mut D,
         ) -> Result<(), RrubError> 
     {
         self.line_buffer.clear();
@@ -58,7 +56,7 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
         let bg_rect = Rectangle::new(Point::zero(), self.screen_size);
         bg_rect
             .into_styled(PrimitiveStyle::with_fill(Rgb888::BLACK))
-            .draw(draw_target)
+            .draw(self.draw_target)
             .map_err(|_| RrubError::DrawingError("Unable to clear screen"))?;
 
         return Ok(());
@@ -66,7 +64,6 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     pub fn clear_line<D: DrawTarget<Color = Rgb888>>(
             &mut self, 
-            draw_target: &mut D,
             y: i32
         ) -> Result<(), RrubError> 
     {
@@ -75,7 +72,7 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
             Size::new(self.screen_size.width, self.char_size.height + self.line_spacing),
         );
         rect.into_styled(PrimitiveStyle::with_fill(Rgb888::BLACK))
-            .draw(draw_target)
+            .draw(self.draw_target)
             .map_err(|_| RrubError::DrawingError("Unable to clear line"))?;
 
         return Ok(());
@@ -83,10 +80,9 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     fn scroll_up<D: DrawTarget<Color = Rgb888>>(
             &mut self,
-            draw_target: &mut D,
         ) -> Result<(), RrubError> 
     {
-        self.clear_screen(draw_target)?;
+        self.clear_screen::<D>()?;
         self.cursor = Point::zero();
 
         return Ok(());
@@ -94,7 +90,6 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     fn newline<D: DrawTarget<Color = Rgb888>>(
             &mut self,
-            draw_target: &mut D,
         ) -> Result<(), RrubError> 
     {   
         self.line_buffer.clear();
@@ -102,7 +97,7 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
         self.cursor.y += (self.char_size.height + self.line_spacing) as i32;
 
         if self.cursor.y + self.char_size.height as i32 > self.screen_size.height as i32 {
-            self.scroll_up(draw_target)?;
+            self.scroll_up::<D>()?;
             self.cursor.y -= (self.char_size.height + self.line_spacing) as i32;
         }
 
@@ -111,12 +106,11 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     fn advance_cursor<D: DrawTarget<Color = Rgb888>>(
             &mut self,
-            draw_target: &mut D,
         ) -> Result<(), RrubError> 
     {
         self.cursor.x += self.char_size.width as i32;
         if self.cursor.x + self.char_size.width as i32 > self.screen_size.width as i32 {
-            self.newline(draw_target)?;
+            self.newline::<D>()?;
         }
 
         return Ok(());
@@ -124,7 +118,6 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     pub fn backspace<D: DrawTarget<Color = Rgb888>>(
             &mut self,
-            draw_target: &mut D
         ) -> Result<(), RrubError> 
     {
         if self.cursor.x >= self.char_size.width as i32 {
@@ -142,7 +135,7 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
             erase_rect
                 .into_styled(PrimitiveStyle::with_fill(Rgb888::BLACK))
-                .draw(draw_target)
+                .draw(self.draw_target)
                 .map_err(|_| RrubError::DrawingError("Unable to draw to backspace charater"))?;
         }
 
@@ -151,20 +144,19 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     pub fn write_char<D: DrawTarget<Color = Rgb888>>(
             &mut self,
-            draw_target: &mut D,
             c: char
         ) -> Result<(), RrubError> 
     {
         match c {
-            '\n' => self.newline(draw_target)?,
+            '\n' => self.newline::<D>()?,
             '\r' => self.cursor.x = 0,
             _ => {
                 self.line_buffer.push(c);
                 Text::new(&c.to_string(), self.cursor, self.style)
-                    .draw(draw_target)
+                    .draw(self.draw_target)
                     .map_err(|_| RrubError::DrawingError("Unable to write char"))?;
 
-                self.advance_cursor(draw_target)?;
+                self.advance_cursor::<D>()?;
             }
         }
         return Ok(());
@@ -172,12 +164,11 @@ impl/*<'a, DT: DrawTarget<Color = Rgb888>> */Terminal<'_>/*<'a, DT>*/ {
 
     pub fn write_str<D: DrawTarget<Color = Rgb888>>(
             &mut self,
-            draw_target: &mut D,
             s: &str
         ) -> Result<(), RrubError> 
     {
         for c in s.chars() {
-            self.write_char(draw_target, c)?;
+            self.write_char::<D>(c)?;
         }
 
         return Ok(());
@@ -189,7 +180,7 @@ pub fn start_shell(input: &mut Input) -> Result<(), RrubError> {
     let mut gop = boot::open_protocol_exclusive::<GraphicsOutput>(gop_handle)?;
 
     let mode = gop.current_mode_info();
-    let mut display = UefiDisplay::new(gop.frame_buffer(), mode)?;
+    let mut display = Display::new(gop.frame_buffer(), mode)?;
 
     println!("display: {:?}", display);
 
@@ -201,8 +192,10 @@ pub fn start_shell(input: &mut Input) -> Result<(), RrubError> {
         .background_color(Rgb888::BLUE)
         .build();
 
+    let stringe = format!("\ndisplay: {:?}", display);
+
     let mut terminal = Terminal {
-        //draw_target: &mut display,
+        draw_target: &mut display,
         line_buffer: Vec::new(),
         style: text_style,
         cursor: Point::new(0, 20),
@@ -212,11 +205,7 @@ pub fn start_shell(input: &mut Input) -> Result<(), RrubError> {
         root: None
     };
 
-    terminal.clear_screen(&mut display)?;
-
-    let stringe = format!("\ndisplay: {:?}", display);
-
-    terminal.write_str(&mut display, &stringe)?;
+    terminal.clear_screen::<Display>()?;
 
     loop {
         let mut events = [input.wait_for_key_event().unwrap()];
@@ -225,13 +214,15 @@ pub fn start_shell(input: &mut Input) -> Result<(), RrubError> {
 
         match input.read_key()? {
             Some(Key::Printable(key)) => { 
+                //let tesrt = format!("\nkey: {:?}", key);
+                //terminal.write_str::<UefiDisplay>(&tesrt);
                 let char = char::from(key);
                 match char {
-                    '\r' => terminal.newline(&mut display)?,
+                    '\r' => terminal.newline::<Display>()?,
                     '\u{8}' => {
-                        terminal.backspace(&mut display)?;
+                        terminal.backspace::<Display>()?;
                     }, 
-                    _ => terminal.write_char(&mut display, char)?,
+                    _ => terminal.write_char::<Display>(char)?,
                 }    
             }
 
@@ -245,26 +236,16 @@ pub fn start_shell(input: &mut Input) -> Result<(), RrubError> {
             }
             */
             Some(Key::Special(ScanCode::ESCAPE)) => {
-                terminal.clear_screen(&mut display)?;
-                terminal.write_str(&mut display, "Escaped")?;
+                terminal.clear_screen::<Display>()?;
+                terminal.write_str::<Display>("Escaped")?;
 
                 break;
-            }
+            },
             _ => {}
         }
-        display.flush();
 
         println!("{:?}", &terminal);
     }
 
     Ok(())
-}
-
-fn assembly_command(
-        chars: Vec<char>
-    ) -> Result<Vec<String>, RrubError>
-{
-
-
-    return Ok(());
 }

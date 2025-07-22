@@ -1,0 +1,17 @@
+[package]
+name = "rrub"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[features]
+default = ["uefi"]
+uefi = []
+bios = []
+
+[dependencies]
+embedded-graphics = { version = "0.8.1", default-features = false }
+embedded-layout = "0.4.2"
+uefi = { version = "0.35.0", features = ["alloc", "global_allocator"], default-features = false}
+uefi-raw = "0.11.0"
+zerocopy = { version = "0.8.26", features = ["derive"], default-features = false }
