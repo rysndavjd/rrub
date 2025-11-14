@@ -1,5 +1,6 @@
-use crate::usb::ToChar;
 use bitflags::bitflags;
+
+use crate::usb::ToChar;
 
 bitflags! {
     #[derive(Debug, Clone, Copy)]

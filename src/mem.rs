@@ -3,13 +3,15 @@ mod mem_bios;
 #[cfg(feature = "uefi")]
 mod mem_uefi;
 
+use core::ptr::NonNull;
+
+use simple_alloc::AllocInit;
+
 use crate::{
     ALLOCATOR, HEAP_PAGES, HEAP_START,
     error::RrubError,
     panic_handler::{print, println},
 };
-use core::ptr::NonNull;
-use simple_alloc::AllocInit;
 
 pub const PAGE_SIZE: usize = 4096;
 

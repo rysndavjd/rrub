@@ -3,8 +3,8 @@ mod fb_uefi;
 #[cfg(feature = "bios")]
 mod vga;
 
-use crate::error::RrubError;
 use alloc::vec::Vec;
+
 use embedded_graphics::{
     Pixel,
     draw_target::DrawTarget,
@@ -12,9 +12,10 @@ use embedded_graphics::{
     prelude::{OriginDimensions, Point, RgbColor, Size},
     primitives::Rectangle,
 };
-
 #[cfg(feature = "uefi")]
 pub use fb_uefi::UefiDisplay;
+
+use crate::error::RrubError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum PixelFormat {

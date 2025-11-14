@@ -14,15 +14,16 @@ extern crate alloc;
 
 use core::time::Duration;
 
+use conquer_once::spin::OnceCell;
+use simple_alloc::bump_alloc::LocklessBumpAlloc;
+use uefi::{boot::stall, prelude::*};
+
 use crate::{
     framebuffer::{GenericDisplay, UefiDisplay},
     mem::init_heap,
     panic_handler::{Logger, init_logger},
     scheduler::{Executor, Task},
 };
-use conquer_once::spin::OnceCell;
-use simple_alloc::bump_alloc::LocklessBumpAlloc;
-use uefi::{boot::stall, prelude::*};
 
 const HEAP_PAGES: usize = 32768;
 static HEAP_START: OnceCell<usize> = OnceCell::uninit();

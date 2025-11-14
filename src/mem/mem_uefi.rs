@@ -1,6 +1,8 @@
-use crate::mem::FirmwareMemory;
 use core::ptr::NonNull;
+
 use uefi::boot::{AllocateType, MemoryType, allocate_pages, free_pages};
+
+use crate::mem::FirmwareMemory;
 
 pub struct UefiMemory;
 

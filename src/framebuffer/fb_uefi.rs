@@ -1,11 +1,13 @@
-use crate::framebuffer::{FrameBufferBackend, PixelFormat};
 use alloc::{vec, vec::Vec};
 use core::ptr::copy_nonoverlapping;
+
 use embedded_graphics::prelude::Size;
 use uefi::{
     boot::{get_handle_for_protocol, open_protocol_exclusive},
     proto::console::gop::{GraphicsOutput, PixelFormat as UefiPixelFormat},
 };
+
+use crate::framebuffer::{FrameBufferBackend, PixelFormat};
 
 impl From<UefiPixelFormat> for PixelFormat {
     fn from(format: UefiPixelFormat) -> Self {

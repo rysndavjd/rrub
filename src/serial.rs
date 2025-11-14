@@ -1,7 +1,8 @@
 pub mod serial_uefi;
 
-use bitflags::bitflags;
 use core::fmt::{Debug, Error as FmtError, Result as FmtResult, Write};
+
+use bitflags::bitflags;
 
 use crate::error::RrubError;
 

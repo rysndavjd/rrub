@@ -1,6 +1,6 @@
 use core::{panic::PanicInfo, time::Duration};
-use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 
+use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 #[cfg(feature = "uefi")]
 pub use uefi::{boot::stall, print, println};
 

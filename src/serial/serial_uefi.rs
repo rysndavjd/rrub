@@ -1,9 +1,10 @@
+use uefi::proto::console::serial::{
+    ControlBits as UefiControlBits, IoMode, Parity as UefiParity, Serial, StopBits as UefiStopBits,
+};
+
 use crate::{
     error::RrubError,
     serial::{SerialBackend, SerialControlBits, SerialParity, SerialStopBits},
-};
-use uefi::proto::console::serial::{
-    ControlBits as UefiControlBits, IoMode, Parity as UefiParity, Serial, StopBits as UefiStopBits,
 };
 
 impl From<UefiParity> for SerialParity {
