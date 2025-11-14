@@ -6,6 +6,7 @@ mod error;
 mod framebuffer;
 mod mem;
 mod panic_handler;
+mod scheduler;
 mod serial;
 mod usb;
 
@@ -15,33 +16,34 @@ use core::time::Duration;
 
 use crate::{
     framebuffer::{GenericDisplay, UefiDisplay},
-    mem::{init_heap, print_mem},
+    mem::init_heap,
+    panic_handler::{Logger, init_logger},
+    scheduler::{Executor, Task},
 };
-use alloc::string::String;
 use conquer_once::spin::OnceCell;
-use simple_alloc::{common::Locked, spin_lock::linked_list_alloc::LinkedListAlloc};
-use uefi::{
-    boot::{MemoryDescriptor, MemoryType, memory_map, stall},
-    prelude::*,
-    print as uefi_print, println as uefi_println,
-};
+use simple_alloc::bump_alloc::LocklessBumpAlloc;
+use uefi::{boot::stall, prelude::*};
 
-const HEAP_PAGES: usize = 8192; // 4096 * 4096 bytes avaliable for allocation
+const HEAP_PAGES: usize = 32768;
 static HEAP_START: OnceCell<usize> = OnceCell::uninit();
 
 #[global_allocator]
-static ALLOCATOR: Locked<LinkedListAlloc> = Locked::new(LinkedListAlloc::new());
+static ALLOCATOR: LocklessBumpAlloc = LocklessBumpAlloc::new();
+
+#[cfg(debug_assertions)]
+static LOGGER: Logger = Logger;
 
 #[entry]
 pub fn main() -> Status {
+    #[cfg(debug_assertions)]
+    init_logger().unwrap();
     init_heap().unwrap();
 
-    // unsafe {
-    //     print_mem(*HEAP_START.lock() as *const u8, HEAP_PAGES * 4096);
-    // }
+    //let mut executor = Executor::new();
 
-    let t = GenericDisplay::new(UefiDisplay::init((720, 480)));
+    //let t = GenericDisplay::new(UefiDisplay::init((720, 480)));
 
-    stall(Duration::from_secs(120));
+    #[cfg(debug_assertions)]
+    stall(Duration::from_mins(2));
     Status::SUCCESS
 }

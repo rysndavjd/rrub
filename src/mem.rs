@@ -1,4 +1,6 @@
+#[cfg(feature = "bios")]
 mod mem_bios;
+#[cfg(feature = "uefi")]
 mod mem_uefi;
 
 use crate::{
@@ -7,6 +9,9 @@ use crate::{
     panic_handler::{print, println},
 };
 use core::ptr::NonNull;
+use simple_alloc::AllocInit;
+
+pub const PAGE_SIZE: usize = 4096;
 
 // These functions are indented to panic if allocating or deallocating a page fails.
 trait FirmwareMemory {
@@ -35,9 +40,7 @@ pub fn init_heap() -> Result<(), RrubError> {
         HEAP_START.init_once(|| ptr.as_ptr() as usize);
 
         unsafe {
-            ALLOCATOR
-                .lock()
-                .init(ptr.as_ptr() as usize, HEAP_PAGES * 4096);
+            ALLOCATOR.init(ptr.as_ptr() as usize, HEAP_PAGES * PAGE_SIZE);
         }
         return Ok(());
     }
