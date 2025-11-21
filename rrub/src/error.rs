@@ -1,6 +1,13 @@
 #[cfg(feature = "uefi")]
 use uefi::Error as FirmwareError;
 
+// #[derive(Debug, Eq, PartialEq, Clone)]
+// pub enum FirmwareError {
+//     SecurityViolation,
+//     DevieError,
+//     Out
+// }
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum RrubError {
     CommandError,
@@ -8,6 +15,7 @@ pub enum RrubError {
     UnsupportedColourFormat,
     Overflow,
     DrawingError,
+    MemoryFault,
     FirmwareError(FirmwareError),
 }
 

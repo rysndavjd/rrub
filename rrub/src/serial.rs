@@ -1,4 +1,4 @@
-pub mod serial_uefi;
+//pub mod serial_uefi;
 
 use core::fmt::{Debug, Error as FmtError, Result as FmtResult, Write};
 

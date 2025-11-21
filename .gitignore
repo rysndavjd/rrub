@@ -1,3 +1,6 @@
-/target
+target
 *OVMF*.fd
-/esp
+esp
+*initramfs.img*
+*vmlinu*
+*.bin

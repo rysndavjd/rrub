@@ -1,0 +1,53 @@
+pub mod e820;
+pub mod elf;
+mod mem_bios;
+#[cfg(feature = "uefi")]
+mod mem_uefi;
+
+use core::ptr::NonNull;
+
+use simple_alloc::AllocInit;
+
+use crate::{ALLOCATOR, HEAP_PAGES_COUNT, HEAP_START};
+
+pub const PAGE_SIZE: usize = 4096;
+
+pub trait FirmwareMemory {
+    fn allocate_pages(count: usize) -> NonNull<u8>;
+    unsafe fn deallocate_pages(ptr: NonNull<u8>, count: usize);
+}
+
+// pub unsafe fn print_mem(heap: *const u8, len: usize) {
+//     unsafe {
+//         for i in 0..len {
+//             if i % 16 == 0 {
+//                 print!("\n{:08x}: ", i);
+//             }
+//             print!("{:02x} ", *heap.add(i));
+//         }
+//         println!();
+//     }
+// }
+
+pub fn init_heap() {
+    #[cfg(feature = "uefi")]
+    {
+        use crate::mem::mem_uefi::UefiMemory;
+
+        let ptr = UefiMemory::allocate_pages(HEAP_PAGES_COUNT);
+        HEAP_START.init_once(|| ptr.as_ptr() as usize);
+
+        unsafe {
+            ALLOCATOR.init(ptr.as_ptr() as usize, HEAP_PAGES_COUNT * PAGE_SIZE);
+        }
+    }
+}
+
+struct MemoryRegion<T> {
+    start: NonNull<T>,
+    count: usize,
+}
+
+impl<T> MemoryRegion<T> {
+    
+}

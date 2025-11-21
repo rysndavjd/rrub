@@ -4,6 +4,7 @@
 
 mod error;
 mod framebuffer;
+mod loaders;
 mod mem;
 mod panic_handler;
 mod scheduler;
@@ -16,16 +17,16 @@ use core::time::Duration;
 
 use conquer_once::spin::OnceCell;
 use simple_alloc::bump_alloc::LocklessBumpAlloc;
-use uefi::{boot::stall, prelude::*};
+#[cfg(feature = "uefi")]
+use uefi::{Status, boot::stall, entry};
 
 use crate::{
-    framebuffer::{GenericDisplay, UefiDisplay},
+    error::RrubError,
     mem::init_heap,
     panic_handler::{Logger, init_logger},
-    scheduler::{Executor, Task},
 };
 
-const HEAP_PAGES: usize = 32768;
+const HEAP_PAGES_COUNT: usize = 32768;
 static HEAP_START: OnceCell<usize> = OnceCell::uninit();
 
 #[global_allocator]
@@ -34,17 +35,26 @@ static ALLOCATOR: LocklessBumpAlloc = LocklessBumpAlloc::new();
 #[cfg(debug_assertions)]
 static LOGGER: Logger = Logger;
 
+static KERNEL: &[u8; 77535936] = include_bytes!("../vmlinux");
+//static INITRD: &[u8; 13144831] = include_bytes!("../initramfs.img");
+
+#[cfg(feature = "uefi")]
 #[entry]
-pub fn main() -> Status {
-    #[cfg(debug_assertions)]
+fn uefi_entry() -> Status {
     init_logger().unwrap();
-    init_heap().unwrap();
+    init_heap();
 
-    //let mut executor = Executor::new();
+    return match main() {
+        Ok(_) => Status::SUCCESS,
+        Err(_) => Status::ABORTED,
+    };
+}
 
-    //let t = GenericDisplay::new(UefiDisplay::init((720, 480)));
+fn main() -> Result<(), RrubError> {
+    // unsafe {
+    //     exit_boot_services(None);
+    // };
 
-    #[cfg(debug_assertions)]
     stall(Duration::from_mins(2));
-    Status::SUCCESS
+    return Ok(());
 }

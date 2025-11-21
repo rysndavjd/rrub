@@ -1,6 +1,4 @@
-#[cfg(feature = "uefi")]
-mod fb_uefi;
-#[cfg(feature = "bios")]
+//mod fb_uefi;
 mod vga;
 
 use alloc::vec::Vec;
@@ -12,8 +10,8 @@ use embedded_graphics::{
     prelude::{OriginDimensions, Point, RgbColor, Size},
     primitives::Rectangle,
 };
-#[cfg(feature = "uefi")]
-pub use fb_uefi::UefiDisplay;
+// #[cfg(feature = "uefi")]
+// pub use fb_uefi::UefiDisplay;
 
 use crate::error::RrubError;
 
