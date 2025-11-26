@@ -17,6 +17,7 @@ pub enum RrubError {
     DrawingError,
     MemoryFault,
     FirmwareError(FirmwareError),
+    UnalignedMemoryAddress,
 }
 
 impl From<FirmwareError> for RrubError {

@@ -13,20 +13,23 @@ mod usb;
 
 extern crate alloc;
 
-use core::time::Duration;
+use core::{mem::offset_of, time::Duration};
 
 use conquer_once::spin::OnceCell;
 use simple_alloc::bump_alloc::LocklessBumpAlloc;
+use uefi::println;
 #[cfg(feature = "uefi")]
 use uefi::{Status, boot::stall, entry};
+use zerocopy::{}
 
 use crate::{
     error::RrubError,
-    mem::init_heap,
+    loaders::linux::x86::{SetupHeader, Zeropage},
+    mem::{Backend, MemoryRegion, init_heap},
     panic_handler::{Logger, init_logger},
 };
 
-const HEAP_PAGES_COUNT: usize = 32768;
+const NUM_HEAP_PAGES: usize = 32768;
 static HEAP_START: OnceCell<usize> = OnceCell::uninit();
 
 #[global_allocator]
@@ -54,6 +57,16 @@ fn main() -> Result<(), RrubError> {
     // unsafe {
     //     exit_boot_services(None);
     // };
+
+    let k_area = unsafe { MemoryRegion::<[u8; 77535936], Backend>::new(0xA000_0000, 1)? };
+
+    k_area.write(0, KERNEL);
+
+    let zeropage = unsafe { MemoryRegion::<Zeropage, Backend>::new(0xB000_0000, 1)? };
+
+    zeropage.write(offset_of!(Zeropage, hdr), &KERNEL[0x1F1..0x1F1 + 4096]);
+
+    println!("{:?}", zeropage.as_ref().hdr);
 
     stall(Duration::from_mins(2));
     return Ok(());

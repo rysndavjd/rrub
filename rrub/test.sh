@@ -22,7 +22,7 @@ fi
 
 cargo build --target x86_64-unknown-uefi
 
-cp "./target/x86_64-unknown-uefi/debug/rrub.efi" "./esp/efi/boot/bootx64.efi"
+cp -rf "./target/x86_64-unknown-uefi/debug/rrub.efi" "./esp/EFI/BOOT/BOOTX64.EFI"
 
 qemu-system-x86_64 \
   -enable-kvm \
