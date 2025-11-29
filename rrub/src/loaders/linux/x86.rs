@@ -1,5 +1,5 @@
 use zerocopy::{
-    FromBytes, Immutable, IntoBytes, LittleEndian, Unaligned,
+    FromBytes, Immutable, IntoBytes, KnownLayout, LittleEndian, Unaligned,
     byteorder::{U16, U32, U64},
 };
 
@@ -12,7 +12,7 @@ pub const E820_MAX_ENTRIES_ZEROPAGE: usize = 128;
 pub const EDD_MBR_SIG_MAX: usize = 16;
 
 #[repr(C, packed)]
-#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Unaligned, Immutable)]
+#[derive(Debug, Clone, Copy, FromBytes, IntoBytes, Unaligned, Immutable, KnownLayout)]
 pub struct SetupHeader {
     pub setup_sects: u8,
     pub root_flags: U16<LittleEndian>,

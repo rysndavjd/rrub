@@ -1,13 +1,19 @@
 pub mod e820;
 pub mod elf;
-pub mod mem_bios;
+mod mem_bios;
 #[cfg(feature = "uefi")]
 mod mem_uefi;
 
-use core::{marker::PhantomData, ptr::NonNull, slice::from_raw_parts};
+use core::{
+    marker::PhantomData,
+    ptr::{NonNull, copy},
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
 
+use bitflags::bitflags;
 use log::error;
 use simple_alloc::AllocInit;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unalign};
 
 use crate::{ALLOCATOR, HEAP_START, NUM_HEAP_PAGES, error::RrubError};
 
@@ -45,19 +51,35 @@ pub fn init_heap() {
     }
 }
 
+bitflags! {
+    #[derive(Debug)]
+    pub struct MemAttr: u8 {
+        const Execute = 1 << 0;
+        const Write = 1 << 1;
+        const Read = 1 << 2;
+    }
+}
+
 #[cfg(feature = "uefi")]
 pub type Backend = crate::mem::mem_uefi::UefiMemory;
 
 pub trait MemoryBackend<T> {
-    fn allocate(addr: u32, page_count: usize) -> Result<NonNull<T>, RrubError>;
+    fn allocate(addr: usize, page_count: usize) -> Result<NonNull<T>, RrubError>;
     unsafe fn deallocate(ptr: NonNull<T>, page_count: usize) -> Result<(), RrubError>;
+    fn get_mem_attrs(addr: usize, page_count: usize) -> Result<MemAttr, RrubError>;
+    unsafe fn update_mem_attrs(
+        addr: usize,
+        page_count: usize,
+        new_attr: MemAttr,
+        clear_attr: MemAttr,
+    ) -> Result<(), RrubError>;
 }
 
 #[derive(Debug)]
 pub struct MemoryRegion<T, B: MemoryBackend<T>> {
-    start: NonNull<T>,        // base
-    object_count: usize,      // number of "T" objects in this memory region
-    page_count: usize,        // number of 4096 byte pages these "T" objects take, padding if needed
+    start: NonNull<T>, // base
+    page_count: usize, // number of 4096 byte pages "T" takes, padding if needed
+    mem_attrs: MemAttr,
     _backend: PhantomData<B>, // backend to use, uefi or bios
 }
 
@@ -77,17 +99,16 @@ impl<T, B: MemoryBackend<T>> Drop for MemoryRegion<T, B> {
 }
 
 impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
-    pub unsafe fn new(addr: u32, count: usize) -> Result<MemoryRegion<T, B>, RrubError> {
+    pub fn new(addr: usize) -> Result<MemoryRegion<T, B>, RrubError> {
         if (addr & 0xFFF) != 0 {
             return Err(RrubError::UnalignedMemoryAddress);
         }
-        let page_count = (size_of::<T>() * count).div_ceil(PAGE_SIZE);
+        let page_count = size_of::<T>().div_ceil(PAGE_SIZE);
 
         let start = B::allocate(addr, page_count)?;
 
         return Ok(MemoryRegion {
             start,
-            object_count: count,
             page_count,
             _backend: PhantomData,
         });
@@ -98,31 +119,70 @@ impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
     }
 
     pub fn length_of_data(&self) -> usize {
-        return self.object_count * size_of::<T>();
+        return size_of::<T>();
+    }
+
+    pub fn as_ptr(&self) -> *mut T {
+        return self.start.as_ptr();
     }
 
     pub fn as_ref(&self) -> &T {
-        unsafe { return self.start.as_ref() }
+        unsafe {
+            return self.start.as_ref();
+        }
     }
 
     pub fn as_mut(&mut self) -> &mut T {
-        unsafe { return self.start.as_mut() }
-    }
-
-    pub fn as_slice<O>(&self, offset: usize, length: usize) -> &[O] {
-        assert!((offset + (length * size_of::<O>())) <= self.length_of_data());
-        unsafe { from_raw_parts((self.start.as_ptr() as usize + offset) as *const O, length) }
-    }
-
-    pub fn read<O: Copy>(&self, offset: usize) -> O {
-        assert!((offset + size_of::<O>()) < self.length_of_data());
-        unsafe { *((self.start.as_ptr() as usize + offset) as *const O) }
-    }
-
-    pub fn write<O>(&self, offset: usize, value: O) {
-        assert!((offset + size_of::<O>()) < self.length_of_data());
         unsafe {
-            *((self.start.as_ptr() as usize + offset) as *mut O) = value;
+            return self.start.as_mut();
         }
+    }
+
+    pub fn read_ref<O: FromBytes + KnownLayout + Immutable>(
+        &self,
+        offset: usize,
+    ) -> Result<&Unalign<O>, RrubError> {
+        assert!((offset + size_of::<O>()) <= self.length_of_data());
+
+        return Unalign::<O>::ref_from_bytes(unsafe {
+            from_raw_parts(
+                (self.start.as_ptr() as usize + offset) as *const u8,
+                size_of::<O>(),
+            )
+        })
+        .map_err(|_| RrubError::UnalignedMemoryAddress);
+    }
+
+    pub fn read_mut<O: FromBytes + IntoBytes + KnownLayout + Immutable>(
+        &mut self,
+        offset: usize,
+    ) -> Result<&mut Unalign<O>, RrubError> {
+        assert!((offset + size_of::<O>()) <= self.length_of_data());
+
+        return Unalign::<O>::mut_from_bytes(unsafe {
+            from_raw_parts_mut(
+                (self.start.as_ptr() as usize + offset) as *mut u8,
+                size_of::<O>(),
+            )
+        })
+        .map_err(|_| RrubError::UnalignedMemoryAddress);
+    }
+
+    pub fn write<O: IntoBytes + KnownLayout + Immutable + ?Sized>(
+        &mut self,
+        value: &O,
+        offset: usize,
+    ) -> Result<(), RrubError> {
+        let bytes = value.as_bytes();
+        assert!((offset + bytes.len()) <= self.length_of_data());
+
+        unsafe {
+            copy(
+                bytes.as_ptr(),
+                (self.start.as_ptr() as *mut u8).add(offset),
+                bytes.len(),
+            );
+        };
+        return Ok(());
     }
 }
