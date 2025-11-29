@@ -70,8 +70,8 @@ pub trait MemoryBackend<T> {
     unsafe fn update_mem_attrs(
         addr: usize,
         page_count: usize,
-        new_attr: MemAttr,
-        clear_attr: MemAttr,
+        new_attrs: &MemAttr,
+        clear_attrs: &MemAttr,
     ) -> Result<(), RrubError>;
 }
 
@@ -99,7 +99,7 @@ impl<T, B: MemoryBackend<T>> Drop for MemoryRegion<T, B> {
 }
 
 impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
-    pub fn new(addr: usize) -> Result<MemoryRegion<T, B>, RrubError> {
+    pub fn new(addr: usize, mem_attrs: MemAttr) -> Result<MemoryRegion<T, B>, RrubError> {
         if (addr & 0xFFF) != 0 {
             return Err(RrubError::UnalignedMemoryAddress);
         }
@@ -107,9 +107,15 @@ impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
 
         let start = B::allocate(addr, page_count)?;
 
+        //let old = B::get_mem_attrs(addr, page_count).unwrap();
+        //unsafe {
+        //    B::update_mem_attrs(addr, page_count, &mem_attrs, &old)?;
+        //}
+
         return Ok(MemoryRegion {
             start,
             page_count,
+            mem_attrs, 
             _backend: PhantomData,
         });
     }
@@ -184,5 +190,15 @@ impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
             );
         };
         return Ok(());
+    }
+
+    pub fn get_mem_attrs(addr: usize, page_count: usize) -> Result<MemAttr, RrubError> {
+        return B::get_mem_attrs(addr, page_count);
+    }
+
+    pub unsafe fn update_mem_attrs(addr: usize, page_count: usize, new_attrs: &MemAttr, clear_attrs: &MemAttr) -> Result<(), RrubError> {
+        unsafe {
+            return B::update_mem_attrs(addr, page_count, new_attrs, clear_attrs);
+        }
     }
 }

@@ -3,7 +3,7 @@ use core::ptr::NonNull;
 use uefi::{
     boot::{
         AllocateType, MemoryAttribute, MemoryType, OpenProtocolParams, allocate_pages, free_pages,
-        get_handle_for_protocol, image_handle, open_protocol, open_protocol_exclusive,
+        get_handle_for_protocol, image_handle, open_protocol, OpenProtocolAttributes
     },
     proto::security::MemoryProtection,
 };
@@ -27,6 +27,26 @@ impl From<MemoryAttribute> for MemAttr {
 
         if value.contains(MemoryAttribute::EXECUTE_PROTECT) {
             attr.remove(MemAttr::Execute);
+        }
+
+        return attr;
+    }
+}
+
+impl From<&MemAttr> for MemoryAttribute {
+    fn from(value: &MemAttr) -> Self {
+        let mut attr = MemoryAttribute::READ_PROTECT | MemoryAttribute::READ_ONLY | MemoryAttribute::EXECUTE_PROTECT;
+
+        if value.contains(MemAttr::Read) {
+            attr.remove(MemoryAttribute::READ_PROTECT);
+        }
+
+        if value.contains(MemAttr::Write) {
+            attr.remove(MemoryAttribute::READ_ONLY);
+        }
+
+        if value.contains(MemAttr::Execute) {
+            attr.remove(MemoryAttribute::EXECUTE_PROTECT);
         }
 
         return attr;
@@ -63,7 +83,7 @@ impl<T> MemoryBackend<T> for UefiMemory {
                 agent: image_handle(),
                 controller: None,
             },
-        )?
+            OpenProtocolAttributes::Exclusive)?
         };
 
         let uefi_attr = mem_protect
@@ -73,10 +93,27 @@ impl<T> MemoryBackend<T> for UefiMemory {
     }
 
     unsafe fn update_mem_attrs(
-        addr: usize,
-        page_count: usize,
-        new_attr: super::MemAttr,
-        clear_attr: super::MemAttr,
-    ) -> Result<(), RrubError> {
+            addr: usize,
+            page_count: usize,
+            new_attrs: &MemAttr,
+            clear_attrs: &MemAttr,
+        ) -> Result<(), RrubError> {
+        let uefi_new_attrs = MemoryAttribute::from(new_attrs);
+        let uefi_clear_attrs = MemoryAttribute::from(clear_attrs);
+
+        let handle = get_handle_for_protocol::<MemoryProtection>()?;
+        let mem_protect = unsafe {
+            open_protocol::<MemoryProtection>(OpenProtocolParams {
+                handle,
+                agent: image_handle(),
+                controller: None,
+            },
+            OpenProtocolAttributes::GetProtocol)?
+        };
+
+        mem_protect.set_memory_attributes((addr as u64)..(addr + (page_count * 4096)) as u64, uefi_new_attrs)?;
+        mem_protect.clear_memory_attributes((addr as u64)..(addr + (page_count * 4096)) as u64, uefi_clear_attrs)?;
+
+        return Ok(());
     }
 }

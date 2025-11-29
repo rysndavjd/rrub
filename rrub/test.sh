@@ -17,7 +17,7 @@ if [ ! -f "./OVMF_CODE.fd" ] || [ ! -f "./OVMF_VARS.fd" ]; then
 fi
 
 if [ ! -d "./esp" ]; then
-    mkdir -p ./esp/efi/boot
+    mkdir -p ./esp/EFI/BOOT
 fi
 
 cargo build --target x86_64-unknown-uefi
@@ -25,7 +25,6 @@ cargo build --target x86_64-unknown-uefi
 cp -rf "./target/x86_64-unknown-uefi/debug/rrub.efi" "./esp/EFI/BOOT/BOOTX64.EFI"
 
 qemu-system-x86_64 \
-  -enable-kvm \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_VARS.fd \
   -m 8G \
