@@ -1,8 +1,6 @@
 pub mod e820;
 pub mod elf;
-mod mem_bios;
-#[cfg(feature = "uefi")]
-mod mem_uefi;
+mod jump;
 
 use core::{
     marker::PhantomData,
@@ -60,26 +58,15 @@ bitflags! {
     }
 }
 
-#[cfg(feature = "uefi")]
-pub type Backend = crate::mem::mem_uefi::UefiMemory;
-
 pub trait MemoryBackend<T> {
     fn allocate(addr: usize, page_count: usize) -> Result<NonNull<T>, RrubError>;
     unsafe fn deallocate(ptr: NonNull<T>, page_count: usize) -> Result<(), RrubError>;
-    fn get_mem_attrs(addr: usize, page_count: usize) -> Result<MemAttr, RrubError>;
-    unsafe fn update_mem_attrs(
-        addr: usize,
-        page_count: usize,
-        new_attrs: &MemAttr,
-        clear_attrs: &MemAttr,
-    ) -> Result<(), RrubError>;
 }
 
 #[derive(Debug)]
 pub struct MemoryRegion<T, B: MemoryBackend<T>> {
-    start: NonNull<T>, // base
-    page_count: usize, // number of 4096 byte pages "T" takes, padding if needed
-    mem_attrs: MemAttr,
+    start: NonNull<T>,        // base
+    page_count: usize,        // number of 4096 byte pages "T" takes, padding if needed
     _backend: PhantomData<B>, // backend to use, uefi or bios
 }
 
@@ -107,15 +94,9 @@ impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
 
         let start = B::allocate(addr, page_count)?;
 
-        //let old = B::get_mem_attrs(addr, page_count).unwrap();
-        //unsafe {
-        //    B::update_mem_attrs(addr, page_count, &mem_attrs, &old)?;
-        //}
-
         return Ok(MemoryRegion {
             start,
             page_count,
-            mem_attrs, 
             _backend: PhantomData,
         });
     }
@@ -192,13 +173,9 @@ impl<T, B: MemoryBackend<T>> MemoryRegion<T, B> {
         return Ok(());
     }
 
-    pub fn get_mem_attrs(addr: usize, page_count: usize) -> Result<MemAttr, RrubError> {
-        return B::get_mem_attrs(addr, page_count);
-    }
-
-    pub unsafe fn update_mem_attrs(addr: usize, page_count: usize, new_attrs: &MemAttr, clear_attrs: &MemAttr) -> Result<(), RrubError> {
+    pub fn zero(&mut self) {
         unsafe {
-            return B::update_mem_attrs(addr, page_count, new_attrs, clear_attrs);
+            self.as_ptr().write_bytes(0, 1);
         }
     }
 }

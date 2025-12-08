@@ -1,6 +1,3 @@
-mod fb_uefi;
-mod vga;
-
 use alloc::vec::Vec;
 
 use embedded_graphics::{
@@ -10,8 +7,6 @@ use embedded_graphics::{
     prelude::{OriginDimensions, Point, RgbColor, Size},
     primitives::Rectangle,
 };
-#[cfg(feature = "uefi")]
-pub use fb_uefi::UefiDisplay;
 
 use crate::error::RrubError;
 
@@ -22,25 +17,28 @@ pub enum PixelFormat {
     NotSupported,
 }
 
-pub trait FrameBufferBackend {
+pub trait FrameBuffer: Sized {
+    fn init_fb_backend(width: usize, height: usize) -> Result<Self, RrubError>;
     fn width(&self) -> usize;
     fn height(&self) -> usize;
-    fn size(&self) -> Size;
     fn stride(&self) -> usize;
     fn pixel_format(&self) -> PixelFormat;
     fn buffer(&mut self) -> &mut Vec<u8>;
-    fn flush(&self);
+    fn flush(&mut self);
 }
 
-pub struct GenericDisplay<B: FrameBufferBackend> {
+pub struct GraphicalDisplay<B: FrameBuffer> {
     backend: B,
 }
 
-impl<B: FrameBufferBackend> GenericDisplay<B> {
-    pub fn new(backend: B) -> Self {
-        let size = backend.size();
+impl<B: FrameBuffer> GraphicalDisplay<B> {
+    fn new(backend: B) -> Self {
+        let size = Size {
+            width: backend.width() as u32,
+            height: backend.height() as u32,
+        };
 
-        let mut framebuffer = GenericDisplay { backend };
+        let mut framebuffer = GraphicalDisplay { backend };
 
         // Use white when starting framebuffer to know something is going on in debug
         #[cfg(debug_assertions)]
@@ -57,13 +55,16 @@ impl<B: FrameBufferBackend> GenericDisplay<B> {
     }
 }
 
-impl<B: FrameBufferBackend> OriginDimensions for GenericDisplay<B> {
+impl<B: FrameBuffer> OriginDimensions for GraphicalDisplay<B> {
     fn size(&self) -> Size {
-        self.backend.size()
+        Size {
+            width: self.backend.width() as u32,
+            height: self.backend.height() as u32,
+        }
     }
 }
 
-impl<B: FrameBufferBackend> DrawTarget for GenericDisplay<B> {
+impl<B: FrameBuffer> DrawTarget for GraphicalDisplay<B> {
     type Color = Rgb888;
     type Error = RrubError;
 

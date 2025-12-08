@@ -3,41 +3,29 @@
 #![allow(clippy::needless_return)]
 
 mod error;
-mod framebuffer;
+mod firmware;
 mod loaders;
-mod mem;
 mod panic_handler;
 mod scheduler;
-mod serial;
-mod usb;
 
 extern crate alloc;
 
-use core::{
-    ffi::c_void,
-    mem::{offset_of, transmute},
-    time::Duration,
-    arch::asm,
-};
+use core::time::Duration;
 
 use conquer_once::spin::OnceCell;
 use simple_alloc::bump_alloc::LocklessBumpAlloc;
-use uefi::{boot::{image_handle, open_protocol}, table::system_table_raw};
-#[cfg(feature = "uefi")]
 use uefi::{
     Status,
     boot::stall,
-    boot::{get_handle_for_protocol, open_protocol_exclusive, OpenProtocolAttributes, OpenProtocolParams},
+    boot::{
+        OpenProtocolAttributes, OpenProtocolParams, get_handle_for_protocol,
+        open_protocol_exclusive,
+    },
     entry, println,
-    proto::loaded_image::{LoadedImage},
+    proto::loaded_image::LoadedImage,
 };
-use uefi_raw::table::system::SystemTable;
-
 use crate::{
-    error::RrubError,
-    loaders::linux::x86::{SetupHeader, Zeropage},
-    mem::{Backend, MemAttr, MemoryRegion, init_heap},
-    panic_handler::{Logger, init_logger},
+    error::RrubError, firmware::Firmware, panic_handler::{Logger, init_logger}
 };
 
 const NUM_HEAP_PAGES: usize = 32768;
@@ -49,64 +37,29 @@ static ALLOCATOR: LocklessBumpAlloc = LocklessBumpAlloc::new();
 #[cfg(debug_assertions)]
 static LOGGER: Logger = Logger;
 
-static KERNEL: &[u8; 14312448] = include_bytes!("../vmlinuz");
-//static INITRD: &[u8; 13144831] = include_bytes!("../initramfs.img");
-
-#[cfg(feature = "uefi")]
 #[entry]
+#[cfg(feature = "uefi")]
 fn uefi_entry() -> Status {
     init_logger().unwrap();
-    init_heap();
 
     match main() {
         Ok(_) => {
+            #[cfg(debug_assertions)]
             stall(Duration::from_mins(2));
             return Status::SUCCESS;
         }
         Err(e) => {
-            println!("{:?}", e);
-            stall(Duration::from_mins(2));
+            #[cfg(debug_assertions)]
+            {
+                println!("{:?}", e);
+                stall(Duration::from_mins(2));
+            }
             return Status::ABORTED;
         }
     }
 }
 
-type HandoverFunc =
-    extern "C" fn(*mut uefi::boot::ScopedProtocol<LoadedImage>, *mut SystemTable, *mut u8);
-
 fn main() -> Result<(), RrubError> {
-    // unsafe {
-    //     exit_boot_services(None);
-    // };
-
-    let mut k_area = MemoryRegion::<[u8; 20532208], Backend>::new(0xA000_0000, MemAttr::all()).unwrap();
-
-    k_area.write(KERNEL, 0)?;
-
-    let mut zeropage = MemoryRegion::<Zeropage, Backend>::new(0xB000_0000, MemAttr::all()).unwrap();
-
-    zeropage.write(
-        &KERNEL[0x1f1..0x1f1 + size_of::<SetupHeader>()],
-        offset_of!(Zeropage, hdr),
-    )?;
-
-    let handle = get_handle_for_protocol::<LoadedImage>()?;
-    let mut image =
-            open_protocol_exclusive::<LoadedImage>(handle).unwrap();
     
-    unsafe {
-        asm!("cli");
-
-        let hf: HandoverFunc = transmute(
-            k_area.as_ptr().addr() + 0xd9e100 + 512,
-        );
-        hf(
-            &mut image,
-            system_table_raw().unwrap().as_ptr(),
-            zeropage.as_ptr() as *mut u8,
-        );
-    }
-
-    println!("error");
     return Ok(());
 }

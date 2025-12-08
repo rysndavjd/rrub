@@ -25,6 +25,7 @@ cargo build --target x86_64-unknown-uefi
 cp -rf "./target/x86_64-unknown-uefi/debug/rrub.efi" "./esp/EFI/BOOT/BOOTX64.EFI"
 
 qemu-system-x86_64 \
+  -serial mon:stdio \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE.fd \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_VARS.fd \
   -m 8G \
