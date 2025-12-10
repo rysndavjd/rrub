@@ -20,7 +20,6 @@ crossbeam-queue = { version = "0.3.12", default-features = false, features = ["a
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
 log = "0.4.28"
 uefi = { version = "0.36.1", features = ["alloc", "logger"] }
-elf = { version = "0.8.0", features = ["alloc"], default-features = false }
 uefi-raw = "0.13.0"
 
 [features]

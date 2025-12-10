@@ -1,11 +1,6 @@
 use alloc::{vec, vec::Vec};
 use core::ptr::copy_nonoverlapping;
 
-// use embedded_graphics::{
-//     Pixel,
-//     pixelcolor::Rgb888,
-//     prelude::{DrawTarget, OriginDimensions, Point, RgbColor, Size},
-// };
 use uefi::{
     boot::{get_handle_for_protocol, open_protocol_exclusive},
     proto::console::gop::{GraphicsOutput, PixelFormat as UefiPixelFormat},

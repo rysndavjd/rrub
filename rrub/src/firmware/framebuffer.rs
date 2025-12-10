@@ -32,7 +32,7 @@ pub struct GraphicalDisplay<B: FrameBuffer> {
 }
 
 impl<B: FrameBuffer> GraphicalDisplay<B> {
-    fn new(backend: B) -> Self {
+    pub fn new(backend: B) -> Self {
         let size = Size {
             width: backend.width() as u32,
             height: backend.height() as u32,

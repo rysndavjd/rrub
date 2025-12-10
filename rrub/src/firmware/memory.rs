@@ -24,7 +24,8 @@ pub enum MemoryType {
     Available,
     Reserved,
     Acpi,
-    BadRAM,
+    Nvs,
+    Unusable,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,8 +36,6 @@ pub struct MemoryRegion {
 }
 
 pub type MemoryMap = Vec<MemoryRegion>;
-
-pub trait MemoryInfo {}
 
 bitflags! {
     #[derive(Debug)]

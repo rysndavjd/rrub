@@ -1,6 +1,7 @@
-mod framebuffer;
-mod input;
-mod memory;
+pub mod framebuffer;
+pub mod input;
+pub mod logger;
+pub mod memory;
 mod u_efi;
 
 use core::ptr::NonNull;
@@ -10,7 +11,7 @@ use crate::{
     firmware::{
         framebuffer::{FrameBuffer, GraphicalDisplay},
         input::{InputBackend, InputHandle},
-        memory::{AllocationType, MemoryInfo, MemoryMap},
+        memory::{AllocationType, MemoryMap},
     },
 };
 
@@ -22,8 +23,8 @@ pub trait Firmware {
 
     fn init_input() -> Result<InputHandle<Self::Input>, RrubError>;
 
-    fn init_tty();
-    fn init_fb() -> Result<GraphicalDisplay<Self::FB>, RrubError>;
+    fn init_tty(columns: usize, rows: usize);
+    fn init_fb(width: usize, height: usize) -> Result<GraphicalDisplay<Self::FB>, RrubError>;
 
     fn get_memory_map(&self) -> MemoryMap;
     fn allocate_pages(
@@ -31,7 +32,7 @@ pub trait Firmware {
         allocation_type: AllocationType,
         count: usize,
     ) -> Result<NonNull<u8>, RrubError>;
-    unsafe fn deallocate_pages(&mut self, ptr: NonNull<u8>) -> Result<(), RrubError>;
+    unsafe fn deallocate_pages(&mut self, ptr: NonNull<u8>, count: usize) -> Result<(), RrubError>;
 
     fn handover() -> !;
     fn reboot() -> !;
