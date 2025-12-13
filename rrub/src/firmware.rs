@@ -6,6 +6,9 @@ mod u_efi;
 
 use core::ptr::NonNull;
 
+#[cfg(feature = "uefi")]
+pub use u_efi::UefiFirmware;
+
 use crate::{
     error::RrubError,
     firmware::{
@@ -23,8 +26,8 @@ pub trait Firmware: Sized {
 
     fn init_input() -> Result<InputHandle<Self::Input>, RrubError>;
 
-    fn init_tty(columns: usize, rows: usize);
-    fn init_fb(width: usize, height: usize) -> Result<GraphicalDisplay<Self::FB>, RrubError>;
+    fn init_tty(&self, columns: usize, rows: usize);
+    fn init_fb(&self, width: usize, height: usize) -> Result<GraphicalDisplay<Self::FB>, RrubError>;
 
     fn get_memory_map(&self) -> MemoryMap;
     fn allocate_pages(

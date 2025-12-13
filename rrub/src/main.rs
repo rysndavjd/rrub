@@ -4,6 +4,7 @@
 
 mod error;
 mod firmware;
+mod parser;
 mod scheduler;
 
 extern crate alloc;
@@ -13,10 +14,7 @@ use core::time::Duration;
 use conquer_once::spin::OnceCell;
 use simple_alloc::bump_alloc::LocklessBumpAlloc;
 
-use crate::{
-    error::RrubError,
-    firmware::{Firmware, logger::init_logger},
-};
+use crate::{error::RrubError, firmware::Firmware};
 
 const NUM_HEAP_PAGES: usize = 32768;
 static HEAP_START: OnceCell<usize> = OnceCell::uninit();
@@ -29,10 +27,11 @@ mod uefi_entry {
     use uefi::{Status, boot::stall, entry, println};
 
     use super::*;
+    use crate::firmware::UefiFirmware;
 
     #[entry]
     fn uefi_entry() -> Status {
-        match main() {
+        match main::<UefiFirmware>() {
             Ok(_) => {
                 #[cfg(debug_assertions)]
                 stall(Duration::from_mins(2));
@@ -50,6 +49,10 @@ mod uefi_entry {
     }
 }
 
-fn main() -> Result<(), RrubError> {
+fn main<T: Firmware>() -> Result<(), RrubError> {
+    let fw = T::init()?;
+
+    fw.init_fb(1920, 1080)?;
+
     return Ok(());
 }

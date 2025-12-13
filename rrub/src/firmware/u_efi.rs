@@ -40,7 +40,7 @@ pub static LOGGER: UefiLogger = UefiLogger::new(LevelFilter::Error);
 
 pub static BOOT_SERVICES_EXITED: AtomicBool = AtomicBool::new(false);
 
-struct UefiFirmware {}
+pub struct UefiFirmware {}
 
 impl Firmware for UefiFirmware {
     type FB = UefiDisplay;
@@ -57,24 +57,28 @@ impl Firmware for UefiFirmware {
             NUM_HEAP_PAGES,
         )?;
 
-        HEAP_START.init_once(|| heap_ptr.as_ptr() as usize);
+        HEAP_START.init_once(|| heap_ptr.addr().get());
 
         unsafe {
-            ALLOCATOR.init(heap_ptr.as_ptr() as usize, NUM_HEAP_PAGES * PAGE_SIZE);
+            ALLOCATOR.init(heap_ptr.addr().get(), NUM_HEAP_PAGES * PAGE_SIZE);
         }
 
-        todo!()
+        return Ok(UefiFirmware {});
     }
 
     fn init_input() -> Result<InputHandle<Self::Input>, RrubError> {
         todo!()
     }
 
-    fn init_tty(columns: usize, rows: usize) {
+    fn init_tty(&self, columns: usize, rows: usize) {
         todo!()
     }
 
-    fn init_fb(width: usize, height: usize) -> Result<GraphicalDisplay<Self::FB>, RrubError> {
+    fn init_fb(
+        &self,
+        width: usize,
+        height: usize,
+    ) -> Result<GraphicalDisplay<Self::FB>, RrubError> {
         let backend = Self::FB::init_fb_backend(width, height)?;
 
         return Ok(GraphicalDisplay::new(backend));
