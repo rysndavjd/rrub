@@ -1,16 +1,14 @@
 use alloc::vec::Vec;
 use core::{
-    alloc::Layout,
+    marker::PhantomData,
     ptr::{NonNull, copy},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
 use bitflags::bitflags;
-use log::error;
-use simple_alloc::BAllocator;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unalign};
 
-use crate::{ALLOCATOR, HEAP_START, NUM_HEAP_PAGES, error::RrubError};
+use crate::error::RrubError;
 
 pub const PAGE_SIZE: usize = 4096;
 
@@ -46,44 +44,56 @@ bitflags! {
     }
 }
 
+pub trait MemoryAllocation {
+    fn allocate<T>(addr: usize, page_count: usize) -> Result<NonNull<T>, RrubError>;
+    fn deallocate<T>(ptr: NonNull<T>, page_count: usize) -> Result<(), RrubError>;
+}
+
 #[derive(Debug)]
-pub struct MemoryArea<T> {
+pub struct MemoryArea<T, B: MemoryAllocation> {
     start: NonNull<T>, // base
     page_count: usize, // number of 4096 byte pages "T" takes, padding if needed
+    _backend: PhantomData<B>,
 }
 
-impl<T> Drop for MemoryArea<T> {
-    fn drop(&mut self) {
-        unsafe {
-            match ALLOCATOR.try_deallocate(
-                NonNull::new_unchecked(self.as_ptr() as *mut u8),
-                Layout::for_value(self),
-            ) {
-                Ok(_) => return,
-                Err(e) => error!(
-                    "Error deallocating dropped memory: {:#X}, {:?}",
-                    self.start.addr(),
-                    e
-                ),
-            }
-        }
+// impl<T, B: MemoryAllocation> Drop for MemoryArea<T, B> {
+//     fn drop(&mut self) {
+//         unsafe {
+//             match ALLOCATOR.try_deallocate(
+//                 NonNull::new_unchecked(self.as_ptr() as *mut u8),
+//                 Layout::for_value(self),
+//             ) {
+//                 Ok(_) => return,
+//                 Err(e) => error!(
+//                     "Error deallocating dropped memory: {:#X}, {:?}",
+//                     self.start.addr(),
+//                     e
+//                 ),
+//             }
+//         }
+//     }
+// }
+
+impl<T, B: MemoryAllocation> MemoryArea<T, B> {
+    pub fn new(addr: usize) -> Result<MemoryArea<T, B>, RrubError> {
+        // if (addr & 0xFFF) != 0 {
+        //     return Err(RrubError::UnalignedMemoryAddress);
+        // }
+        let page_count = size_of::<T>().div_ceil(PAGE_SIZE);
+
+        let start = B::allocate(addr, page_count)?;
+
+        return Ok(MemoryArea {
+            start,
+            page_count,
+            _backend: PhantomData,
+        });
     }
-}
 
-impl<T> MemoryArea<T> {
-    // pub fn new(addr: usize, mem_attrs: MemAttr) -> Result<MemoryRegion<T>, RrubError> {
-    //     if (addr & 0xFFF) != 0 {
-    //         return Err(RrubError::UnalignedMemoryAddress);
-    //     }
-    //     let page_count = size_of::<T>().div_ceil(PAGE_SIZE);
-
-    //     //let start = B::allocate(addr, page_count)?;
-
-    //     return Ok(MemoryRegion {
-    //         start,
-    //         page_count,
-    //     });
-    // }
+    pub fn deallocate(self) -> Result<(), RrubError> {
+        B::deallocate(self.start, self.page_count)?;
+        return Ok(());
+    }
 
     pub fn length_of_pages(&self) -> usize {
         return self.page_count * PAGE_SIZE;

@@ -15,11 +15,11 @@ use crate::{
     },
 };
 
-pub trait Firmware {
+pub trait Firmware: Sized {
     type Input: InputBackend;
     type FB: FrameBuffer;
 
-    fn init() -> Self;
+    fn init() -> Result<Self, RrubError>;
 
     fn init_input() -> Result<InputHandle<Self::Input>, RrubError>;
 

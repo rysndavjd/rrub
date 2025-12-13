@@ -4,24 +4,25 @@ use core::{
 };
 
 use log::LevelFilter;
+use simple_alloc::AllocInit;
 use uefi::{
     Status,
     boot::{
-        AllocateType as UefiAllocateType, MemoryType, allocate_pages, exit_boot_services,
-        free_pages,
+        AllocateType as UefiAllocateType, AllocateType, MemoryType, allocate_pages,
+        exit_boot_services, free_pages,
     },
     mem::memory_map::MemoryMap as UefiMemoryMap,
     runtime::{ResetType, reset},
 };
 
 use crate::{
-    RrubError,
+    ALLOCATOR, HEAP_START, NUM_HEAP_PAGES, RrubError,
     firmware::{
         Firmware,
         framebuffer::{FrameBuffer, GraphicalDisplay},
         input::InputHandle,
         logger::init_logger,
-        memory::{AllocationType, MemoryMap, MemoryRegion},
+        memory::{AllocationType, MemoryMap, MemoryRegion, PAGE_SIZE},
         u_efi::{gop::UefiDisplay, input::UefiInput, logger::UefiLogger},
     },
 };
@@ -45,7 +46,23 @@ impl Firmware for UefiFirmware {
     type FB = UefiDisplay;
     type Input = UefiInput;
 
-    fn init() -> Self {
+    fn init() -> Result<Self, RrubError> {
+        if init_logger().is_err() {
+            return Err(Status::LOAD_ERROR.into());
+        };
+
+        let heap_ptr = allocate_pages(
+            AllocateType::AnyPages,
+            MemoryType::LOADER_DATA,
+            NUM_HEAP_PAGES,
+        )?;
+
+        HEAP_START.init_once(|| heap_ptr.as_ptr() as usize);
+
+        unsafe {
+            ALLOCATOR.init(heap_ptr.as_ptr() as usize, NUM_HEAP_PAGES * PAGE_SIZE);
+        }
+
         todo!()
     }
 

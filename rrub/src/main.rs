@@ -32,10 +32,6 @@ mod uefi_entry {
 
     #[entry]
     fn uefi_entry() -> Status {
-        if init_logger().is_err() {
-            return Status::PROTOCOL_ERROR;
-        };
-
         match main() {
             Ok(_) => {
                 #[cfg(debug_assertions)]

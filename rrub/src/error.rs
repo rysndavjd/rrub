@@ -1,13 +1,6 @@
 #[cfg(feature = "uefi")]
 use uefi::Error as FirmwareError;
 
-// #[derive(Debug, Eq, PartialEq, Clone)]
-// pub enum FirmwareError {
-//     SecurityViolation,
-//     DevieError,
-//     Out
-// }
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum RrubError {
     CommandError,
@@ -20,8 +13,21 @@ pub enum RrubError {
     UnalignedMemoryAddress,
 }
 
-impl From<FirmwareError> for RrubError {
-    fn from(error: FirmwareError) -> Self {
-        RrubError::FirmwareError(error)
+#[cfg(feature = "uefi")]
+mod uefi_errors {
+    use uefi::{Error, Status};
+
+    use super::*;
+
+    impl From<Error> for RrubError {
+        fn from(error: Error) -> Self {
+            RrubError::FirmwareError(error)
+        }
+    }
+
+    impl From<Status> for RrubError {
+        fn from(status: Status) -> Self {
+            RrubError::FirmwareError(Error::from(status))
+        }
     }
 }
