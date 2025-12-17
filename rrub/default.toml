@@ -1,0 +1,6 @@
+enable_gui = true
+enable_recovery = false
+
+boot_delay = 5
+
+default_entry = "Gentoo Linux"

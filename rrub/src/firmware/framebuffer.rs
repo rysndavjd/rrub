@@ -4,8 +4,7 @@ use embedded_graphics::{
     Pixel,
     draw_target::DrawTarget,
     pixelcolor::Rgb888,
-    prelude::{OriginDimensions, Point, RgbColor, Size},
-    primitives::Rectangle,
+    prelude::{Dimensions, OriginDimensions, Point, RgbColor, Size},
 };
 
 use crate::error::RrubError;
@@ -33,22 +32,17 @@ pub struct GraphicalDisplay<B: FrameBuffer> {
 
 impl<B: FrameBuffer> GraphicalDisplay<B> {
     pub fn new(backend: B) -> Self {
-        let size = Size {
-            width: backend.width() as u32,
-            height: backend.height() as u32,
-        };
-
         let mut framebuffer = GraphicalDisplay { backend };
 
         // Use white when starting framebuffer to know something is going on in debug
         #[cfg(debug_assertions)]
         framebuffer
-            .fill_solid(&Rectangle::new(Point::zero(), size), Rgb888::WHITE)
+            .fill_solid(&framebuffer.bounding_box(), Rgb888::WHITE)
             .expect("Unable to fill screen white.");
 
         #[cfg(not(debug_assertions))]
         framebuffer
-            .fill_solid(&Rectangle::new(Point::zero(), size), Rgb888::BLACK)
+            .fill_solid(&framebuffer.bounding_box(), Rgb888::BLACK)
             .expect("Unable to fill screen black.");
 
         framebuffer

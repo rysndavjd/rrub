@@ -52,7 +52,7 @@ mod uefi_entry {
 fn main<T: Firmware>() -> Result<(), RrubError> {
     let fw = T::init()?;
 
-    fw.init_fb(1920, 1080)?;
+    //let mut fb = fw.init_fb(720, 480)?;
 
     return Ok(());
 }

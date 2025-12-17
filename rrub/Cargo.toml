@@ -18,10 +18,12 @@ simple_alloc = { path= "../../simple_alloc" }
 conquer-once = { version = "0.4.0", default-features = false }
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
-log = "0.4.28"
+log = { version = "0.4.28", default-features = false }
 uefi = { version = "0.36.1", features = ["alloc", "logger"] }
 uefi-raw = { version = "0.13.0", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["parse", "serde"]}
+serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
+uuid = { version = "1.19.0", default-features = false, features = ["zerocopy", "serde"] }
 
 [features]
 default = ["uefi"]

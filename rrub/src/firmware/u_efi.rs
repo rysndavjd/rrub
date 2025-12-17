@@ -19,6 +19,7 @@ use crate::{
     ALLOCATOR, HEAP_START, NUM_HEAP_PAGES, RrubError,
     firmware::{
         Firmware,
+        filesystem::FilesystemsList,
         framebuffer::{FrameBuffer, GraphicalDisplay},
         input::InputHandle,
         logger::init_logger,
@@ -66,7 +67,7 @@ impl Firmware for UefiFirmware {
         return Ok(UefiFirmware {});
     }
 
-    fn init_input() -> Result<InputHandle<Self::Input>, RrubError> {
+    fn init_input(&self) -> Result<InputHandle<Self::Input>, RrubError> {
         todo!()
     }
 
@@ -85,9 +86,9 @@ impl Firmware for UefiFirmware {
     }
 
     fn get_memory_map(&self) -> MemoryMap {
-        let uefi_map = unsafe { exit_boot_services(None) };
-
         BOOT_SERVICES_EXITED.store(true, Ordering::SeqCst);
+
+        let uefi_map = unsafe { exit_boot_services(None) };
 
         return uefi_map.entries().map(MemoryRegion::from).collect();
     }
@@ -113,15 +114,19 @@ impl Firmware for UefiFirmware {
         return Ok(());
     }
 
-    fn handover() -> ! {
+    fn get_filesystems(&self) -> Result<FilesystemsList, RrubError> {
         todo!()
     }
 
-    fn reboot() -> ! {
+    fn handover(self) -> ! {
+        todo!()
+    }
+
+    fn reboot(self) -> ! {
         reset(ResetType::COLD, Status::SUCCESS, None)
     }
 
-    fn shutdown() -> ! {
+    fn shutdown(self) -> ! {
         reset(ResetType::SHUTDOWN, Status::SUCCESS, None)
     }
 }
